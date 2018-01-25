@@ -15,12 +15,6 @@ def load_dataset():
     return mnist
 
 
-def save_as_image(arr, fn='file.png'):
-    arr2 = arr.copy()
-    arr2.resize((28, 28))
-    Image.fromarray(arr2).save(fn)
-
-
 class NeuralNet:
     def __init__(self):
         self.dbn = MLPClassifier(
@@ -95,12 +89,11 @@ class MyGui:
         self.draw.rectangle((0, 0) + (self.w, self.h), fill=0)
 
     def on_button(self):
-        # self.img.save('from_canvas.png')
         self.nn.load_nn()
         arr = self.as_array()
         # print(arr)
         # p = self.nn.dbn.predict(arr)
-        p = parallel(lambda a: self.nn.dbn.predict(a), arr, 1)
+        p = ParallelProcesser.parallel(lambda a: self.nn.dbn.predict(a), arr, 1)
         print(p)
         self.label.config(text=str(p))
 
@@ -123,21 +116,23 @@ class MyGui:
         self.coord = new_coord
 
 
-def parallel(f, arr, n):
-    from multiprocessing.pool import ThreadPool
-    pool = ThreadPool(processes=n)
-    m = min(len(arr), n)
-    if m <= 0:
-        return []
-    ts = []
-    chunk_size = len(arr) // m
-    for i in range(0, len(arr), chunk_size):
-        t = pool.apply_async(f, (arr[i:i + chunk_size],))
-        ts.append(t)
-    r = []
-    for t in ts:
-        r.extend(t.get())
-    return r
+class ParallelProcesser:
+    @staticmethod
+    def parallel(f, arr, n):
+        from multiprocessing.pool import ThreadPool
+        pool = ThreadPool(processes=n)
+        m = min(len(arr), n)
+        if m <= 0:
+            return []
+        ts = []
+        chunk_size = len(arr) // m
+        for i in range(0, len(arr), chunk_size):
+            t = pool.apply_async(f, (arr[i:i + chunk_size],))
+            ts.append(t)
+        r = []
+        for t in ts:
+            r.extend(t.get())
+        return r
 
 
 def as_array(img):
@@ -169,16 +164,10 @@ class Segmenter:
             s1.paste(s, box=((maxw - s.size[0]) // 2, (maxw - s.size[1]) // 2))
             s2 = s1.resize((28, 28))
             arrays.append(as_array(s2))
-            s2.save("%s.png" % len(arrays))
         return arrays
 
 
-def dslice(arr, fr, to, step, width):
-    return [arr[i:i + width] for i in range(fr, to, step)]
-
-
 if __name__ == '__main__':
-    # save_as_image(data.data[5900])
     nn = NeuralNet()
     gui = MyGui(nn)
     gui.root.mainloop()
