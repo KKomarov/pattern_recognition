@@ -25,7 +25,7 @@ class NeuralNet:
     def __init__(self):
         self.dbn = MLPClassifier(
             # [28 * 28, 300, 10],
-            (700, ),
+            (700,),
             learning_rate="constant",
             # learn_rate_decays=0.9,
             max_iter=20,
@@ -69,7 +69,8 @@ class MyGui:
         root.title("Neural network course work")
         frame = tk.Frame(root)
         frame.pack()
-        self.canvas = tk.Canvas(frame, bg='black', width=28, height=28)
+        self.w, self.h = 300, 50
+        self.canvas = tk.Canvas(frame, bg='black', width=self.w, height=self.h)
         self.canvas.pack()
         self.label = tk.Label(frame, fg="dark green", height=1, width=5)
         self.label.pack()
@@ -77,7 +78,7 @@ class MyGui:
         button.pack(side=tk.LEFT)
         tk.Button(frame, text="Clear", command=self.clear_canvas).pack(side=tk.LEFT)
         tk.Button(frame, text="Train", command=self.train_nn).pack(side=tk.LEFT)
-        self.img = Image.new(mode='L', size=(28, 28), color=0)
+        self.img = Image.new(mode='L', size=(self.w, self.h), color=0)
         self.draw = ImageDraw.Draw(self.img)
         self.coord = None
         self.canvas.bind('<B1-Motion>', self.paint)
@@ -91,22 +92,23 @@ class MyGui:
 
     def clear_canvas(self):
         self.canvas.delete('all')
-        self.draw.rectangle((0, 0) + (28, 28), fill=0)
+        self.draw.rectangle((0, 0) + (self.w, self.h), fill=0)
 
     def on_button(self):
         # self.img.save('from_canvas.png')
         self.nn.load_nn()
         arr = self.as_array()
         # print(arr)
-        p = self.nn.dbn.predict([arr, ])
+        p = self.nn.dbn.predict(arr)
         print(p)
-        self.label.config(text=str(p[0]))
+        self.label.config(text=str(p))
 
     def reset(self, event):
         self.coord = None
 
     def as_array(self):
-        return np.fromstring(self.img.tobytes(), dtype=np.uint8) / 255.
+        seg = Segmenter(self.w, self.h)
+        return seg.process(self.img)
 
     def paint(self, event):
         line_width = 3
@@ -118,6 +120,39 @@ class MyGui:
                                     width=line_width, fill=paint_color,
                                     capstyle=tk.ROUND, smooth=tk.TRUE, splinesteps=36)
         self.coord = new_coord
+
+
+def as_array(img):
+    return np.fromstring(img.tobytes(), dtype=np.uint8) / 255.
+
+
+class Segmenter:
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+
+    def process(self, img):
+        start = None
+        symbol_ranges = []
+        for x in range(self.w):
+            s = all(0 == img.getpixel((x, y)) for y in range(self.h))
+            if s and start is not None:
+                symbol_ranges.append((start, x))
+                start = None
+            if not s and start is None:
+                start = x
+        if start is not None:
+            symbol_ranges.append((start, self.w))
+
+        arrays = []
+        for start, end in symbol_ranges:
+            s = img.crop((start, 0) + (end, self.h))
+            maxw = max(s.size)
+            s1 = Image.new(mode='L', size=(maxw, maxw), color=0)
+            s1.paste(s, box=((maxw - s.size[0]) // 2, (maxw - s.size[1]) // 2))
+            s2 = s1.resize((28, 28))
+            arrays.append(as_array(s2))
+            s2.save("%s.png" % len(arrays))
+        return arrays
 
 
 def dslice(arr, fr, to, step, width):
