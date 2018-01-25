@@ -72,7 +72,7 @@ class MyGui:
         self.w, self.h = 300, 50
         self.canvas = tk.Canvas(frame, bg='black', width=self.w, height=self.h)
         self.canvas.pack()
-        self.label = tk.Label(frame, fg="dark green", height=1, width=5)
+        self.label = tk.Label(frame, fg="dark green", height=1, width=40)
         self.label.pack()
         button = tk.Button(frame, text="Test", command=self.on_button)
         button.pack(side=tk.LEFT)
@@ -99,7 +99,8 @@ class MyGui:
         self.nn.load_nn()
         arr = self.as_array()
         # print(arr)
-        p = self.nn.dbn.predict(arr)
+        # p = self.nn.dbn.predict(arr)
+        p = parallel(lambda a: self.nn.dbn.predict(a), arr, 1)
         print(p)
         self.label.config(text=str(p))
 
@@ -120,6 +121,23 @@ class MyGui:
                                     width=line_width, fill=paint_color,
                                     capstyle=tk.ROUND, smooth=tk.TRUE, splinesteps=36)
         self.coord = new_coord
+
+
+def parallel(f, arr, n):
+    from multiprocessing.pool import ThreadPool
+    pool = ThreadPool(processes=n)
+    m = min(len(arr), n)
+    if m <= 0:
+        return []
+    ts = []
+    chunk_size = len(arr) // m
+    for i in range(0, len(arr), chunk_size):
+        t = pool.apply_async(f, (arr[i:i + chunk_size],))
+        ts.append(t)
+    r = []
+    for t in ts:
+        r.extend(t.get())
+    return r
 
 
 def as_array(img):
